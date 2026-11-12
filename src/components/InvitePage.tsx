@@ -115,7 +115,7 @@ export const InvitePage: React.FC<Props> = ({ inv, guestName, onOpenMap, celebra
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block text-[clamp(15px,4.4vw,17px)] font-black tracking-wide">MỞ BẢN ĐỒ ĐƯỜNG ĐI</span>
-                <span className="block text-[13px] text-white/85">Sa bàn 3D từ cổng trường tới Hội trường C</span>
+                <span className="block text-[13px] text-white/85 text-balance">{'Sa bàn 3D từ cổng trường tới Hội\u00a0trường\u00a0C'}</span>
               </span>
               <ChevronRight className="w-5 h-5 shrink-0" />
             </button>
@@ -129,7 +129,7 @@ export const InvitePage: React.FC<Props> = ({ inv, guestName, onOpenMap, celebra
               </a>
             </div>
 
-            <p className="pt-1 text-center text-[13px] italic text-[#444] leading-relaxed">“{inv.message}”</p>
+            <p className="pt-1 text-center text-[13px] italic text-[#444] leading-relaxed text-pretty">“{inv.message}”</p>
           </div>
         </div>
       </div>
@@ -139,13 +139,24 @@ export const InvitePage: React.FC<Props> = ({ inv, guestName, onOpenMap, celebra
   )
 }
 
+/**
+ * Chỉ cho xuống dòng ở dấu phẩy / gạch nối: "TP. Hồ Chí Minh" không bị tách thành "TP. Hồ / Chí Minh".
+ * Cụm quá dài (>22 ký tự) vẫn được ngắt bình thường để không tràn trên máy hẹp.
+ */
+const keepPhrases = (text: string) =>
+  text
+    .split(/(, | – )/)
+    .map((s, i) => (i % 2 === 1 || s.length > 22 ? s : s.replace(/ /g, ' ')))
+    .join('')
+
 const InfoRow: React.FC<{ label: string; title: string; sub: string; href?: string }> = ({ label, title, sub, href }) => {
   const body = (
     <>
       <span className="zine-pill w-[78px] justify-center shrink-0 mt-0.5">{label}</span>
       <span className="min-w-0">
-        <span className="block text-[15px] font-extrabold leading-snug break-words">{title}</span>
-        <span className="block text-[13px] text-[#444] leading-snug mt-0.5">{sub}</span>
+        <span className="block text-[15px] font-extrabold leading-snug break-words text-balance">{keepPhrases(title)}</span>
+        {/* text-balance: các dòng dài gần bằng nhau, không còn 1–2 chữ lẻ loi ở dòng cuối */}
+        <span className="block text-[13px] text-[#444] leading-snug mt-0.5 text-balance">{keepPhrases(sub)}</span>
       </span>
     </>
   )

@@ -61,10 +61,10 @@ export const CollageInvite = memo(function CollageInvite({ inv, guestName }: { i
       >
         <img src={BG} alt="" width={W} height={H} decoding="async" fetchPriority="high" style={{ position: 'absolute', inset: 0, width: W, height: H, display: 'block' }} />
 
-        {/* Bảng tên vàng – nửa trái bị ảnh người che (như thiết kế Canva) nên chỉ ghi tên trên phần bảng lộ ra, nghiêng 3,75° */}
-        <Slot cx={594} top={496} width={148} rotate={3.75}>
+        {/* Bảng tên vàng (nằm trên ảnh người, lộ trọn) – nghiêng 3,75° như thiết kế Canva */}
+        <Slot cx={574.8} top={505} width={250} rotate={3.75}>
           <FitText max={16} min={8} style={{ fontWeight: 800, color: '#000', lineHeight: 1.2 }}>
-            {inv.graduateName.toUpperCase()}
+            {`${inv.degreeTitle} ${inv.graduateName}`.toUpperCase()}
           </FitText>
         </Slot>
 
