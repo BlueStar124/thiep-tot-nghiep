@@ -161,3 +161,36 @@ function forgetOwner() {
 }
 
 export const inviteUrl = (slug: string, guestSlug?: string) => `${location.origin}/${slug}${guestSlug ? `/${guestSlug}` : ''}`
+
+/** Một lời chúc (giống server/invite-store.ts) */
+export interface Wish {
+  id: string
+  name: string
+  guestName?: string
+  attending: boolean
+  people: number
+  message: string
+  at: number
+}
+
+const postJson = <T>(body: object) =>
+  call<T>('/api/invite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+
+/** Khách gửi lời chúc: lưu thẳng vào database của thiệp */
+export function sendWish(slug: string, guestSlug: string | undefined, data: { name: string; attending: boolean; people: number; message: string; website?: string }) {
+  return postJson<{ ok: true }>({ action: 'wish', slug, guest: guestSlug, ...data })
+}
+
+/** Chủ thiệp đọc lời chúc (mới nhất trước) – cần khoá sửa trên máy này */
+export async function fetchWishes(): Promise<Wish[]> {
+  const owner = loadOwner()
+  if (!owner) throw Object.assign(new Error('Máy này chưa có quyền chủ thiệp'), { status: 403 })
+  const res = await postJson<{ wishes: Wish[] }>({ action: 'wishes', slug: owner.slug, editKey: owner.editKey })
+  return res.wishes
+}
+
+export async function deleteWish(id: string) {
+  const owner = loadOwner()
+  if (!owner) throw new Error('Máy này chưa có quyền chủ thiệp')
+  await postJson({ action: 'deleteWish', slug: owner.slug, editKey: owner.editKey, id })
+}

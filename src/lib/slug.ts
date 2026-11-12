@@ -36,7 +36,7 @@ export function ownerSlugFrom(fullName: string): string {
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/
 
 /** Những đường dẫn không được dùng làm tên thiệp */
-export const RESERVED_SLUGS = new Set(['api', 'assets', 'index', 'index-html', 'admin', 'favicon-svg', 'anh-chinh-png', 'anh-phu-png'])
+export const RESERVED_SLUGS = new Set(['api', 'dashboard', 'assets', 'index', 'index-html', 'admin', 'favicon-svg', 'anh-chinh-png', 'anh-phu-png'])
 
 export interface Guest {
   slug: string

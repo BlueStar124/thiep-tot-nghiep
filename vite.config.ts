@@ -8,20 +8,41 @@ import { getInvite, saveInvite, type KV } from './server/invite-store.js'
 /** Chạy thử API /api/invite trên máy: lưu vào file .data/invites.json thay cho Upstash */
 function localInviteApi(): Plugin {
   const file = path.resolve('.data/invites.json')
-  const load = async (): Promise<Record<string, string>> => {
+  const load = async (): Promise<Record<string, string | string[]>> => {
     try {
       return JSON.parse(await readFile(file, 'utf8'))
     } catch {
       return {}
     }
   }
+  const save = async (all: Record<string, string | string[]>) => {
+    await mkdir(path.dirname(file), { recursive: true })
+    await writeFile(file, JSON.stringify(all, null, 2))
+  }
+  const arr = (v: string | string[] | undefined) => (Array.isArray(v) ? v : [])
   const kv: KV = {
-    get: async (key) => (await load())[key] ?? null,
+    get: async (key) => {
+      const v = (await load())[key]
+      return typeof v === 'string' ? v : null
+    },
     set: async (key, value) => {
       const all = await load()
       all[key] = value
-      await mkdir(path.dirname(file), { recursive: true })
-      await writeFile(file, JSON.stringify(all, null, 2))
+      await save(all)
+    },
+    push: async (key, value) => {
+      const all = await load()
+      all[key] = [value, ...arr(all[key])]
+      await save(all)
+    },
+    list: async (key, max) => arr((await load())[key]).slice(0, max),
+    remove: async (key, value) => {
+      const all = await load()
+      const list = arr(all[key])
+      const i = list.indexOf(value)
+      if (i >= 0) list.splice(i, 1)
+      all[key] = list
+      await save(all)
     }
   }
   return {

@@ -16,6 +16,14 @@ function kv(): KV | null {
     get: async (key) => (await redis.get<string>(key)) ?? null,
     set: async (key, value) => {
       await redis.set(key, value)
+    },
+    // Danh sách Redis: thêm/xoá từng phần tử nguyên tử, nhiều khách gửi cùng lúc không đè nhau
+    push: async (key, value) => {
+      await redis.lpush(key, value)
+    },
+    list: async (key, max) => (await redis.lrange<string>(key, 0, max - 1)) ?? [],
+    remove: async (key, value) => {
+      await redis.lrem(key, 1, value)
     }
   }
 }

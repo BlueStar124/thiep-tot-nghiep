@@ -7,6 +7,7 @@ import { invitationFromUrl } from './lib/invite-tools'
 // Tải chậm: khách mở link chỉ cần trang thiệp; trình tạo thiệp và bản đồ 3D tải khi dùng tới
 const Editor = lazy(() => import('./components/Editor').then((m) => ({ default: m.Editor })))
 const MapTour = lazy(() => import('./components/MapTour').then((m) => ({ default: m.MapTour })))
+const Dashboard = lazy(() => import('./components/Dashboard').then((m) => ({ default: m.Dashboard })))
 const LockScreen = lazy(() => import('./components/LockScreen').then((m) => ({ default: m.LockScreen })))
 import { fetchInvite, isUnlocked } from './lib/api'
 
@@ -15,18 +16,20 @@ import { fetchInvite, isUnlocked } from './lib/api'
  * - /minh        → thiệp chung, không ghi tên khách
  * - ?t=…         → link kiểu cũ (nội dung nằm trong link), vẫn mở được
  * - /            → trình tạo thiệp của chủ thiệp
+ * - /dashboard   → chủ thiệp xem lời chúc & ai sẽ đến
  */
 function parseRoute() {
   const segs = location.pathname.split('/').filter(Boolean).map((s) => decodeURIComponent(s).toLowerCase())
   return { slug: segs[0] ?? '', guestSlug: segs[1] ?? '' }
 }
 
-type GuestState = { status: 'loading' } | { status: 'ready'; inv: Invitation; guestName?: string } | { status: 'missing' } | { status: 'error'; message: string }
+type GuestState = { status: 'loading' } | { status: 'ready'; inv: Invitation; guestName?: string; slug?: string; guestSlug?: string } | { status: 'missing' } | { status: 'error'; message: string }
 
 export const App: React.FC = () => {
   const route = useRef(parseRoute())
   const legacy = useRef(invitationFromUrl())
-  const isGuest = !!route.current.slug || !!legacy.current
+  const isDashboard = route.current.slug === 'dashboard'
+  const isGuest = (!!route.current.slug && !isDashboard) || !!legacy.current
 
   const [inv, setInv] = useState<Invitation>(() => (legacy.current ? { ...DEFAULT_INVITATION, ...legacy.current } : loadInvitation()))
   const [guest, setGuest] = useState<GuestState>(() => (legacy.current ? { status: 'ready', inv: { ...DEFAULT_INVITATION, ...legacy.current } } : { status: 'loading' }))
@@ -49,7 +52,7 @@ export const App: React.FC = () => {
         const wanted = `/${data.slug}${guestSlug ? `/${guestSlug}` : ''}`
         if (location.pathname !== wanted) history.replaceState(null, '', wanted + location.search)
         setInv(invitation)
-        setGuest({ status: 'ready', inv: invitation, guestName })
+        setGuest({ status: 'ready', inv: invitation, guestName, slug: data.slug, guestSlug: guestName ? guestSlug : undefined })
         document.title = guestName ? `${guestName} ơi, mời bạn dự lễ tốt nghiệp của ${invitation.graduateName}` : `Thiệp mời lễ tốt nghiệp của ${invitation.graduateName}`
       })
       .catch((err: Error & { status?: number }) => {
@@ -80,7 +83,7 @@ export const App: React.FC = () => {
     )
 
   if (isGuest) {
-    if (guest.status === 'ready') return <InvitePage inv={guest.inv} guestName={guest.guestName} onOpenMap={openMap} />
+    if (guest.status === 'ready') return <InvitePage inv={guest.inv} guestName={guest.guestName} onOpenMap={openMap} slug={guest.slug} guestSlug={guest.guestSlug} />
     return <GuestStatus state={guest} />
   }
 
@@ -94,6 +97,13 @@ export const App: React.FC = () => {
             setUnlocked(true)
           }}
         />
+      </Suspense>
+    )
+
+  if (isDashboard)
+    return (
+      <Suspense fallback={<Loading text="Đang mở bảng theo dõi…" />}>
+        <Dashboard inv={inv} />
       </Suspense>
     )
 

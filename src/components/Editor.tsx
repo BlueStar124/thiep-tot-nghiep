@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Eye, GraduationCap, CalendarClock, MessageSquareHeart, Link2, RotateCcw, ImageIcon, PencilLine, Users, X, Plus } from 'lucide-react'
+import { Eye, GraduationCap, CalendarClock, MessageSquareHeart, Link2, RotateCcw, ImageIcon, PencilLine, Users, X, Plus, Heart } from 'lucide-react'
 import { CollageInvite } from './CollageInvite'
 import { PublishSheet, field, label } from './Sheets'
 import { assignGuestSlugs, ownerSlugFrom, slugDisplay } from '../lib/slug'
@@ -72,7 +72,11 @@ export const Editor: React.FC<Props> = ({ inv, onChange, onPreview }) => {
             <p className="text-[14px] font-extrabold text-slate-900 leading-tight truncate">Tạo thiệp tốt nghiệp</p>
             <p className="text-[12px] text-slate-500 leading-tight truncate">Tự động lưu trên máy này</p>
           </div>
-          <div className="ml-auto hidden lg:flex items-center gap-2">
+          {/* Lời chúc khách gửi: trang /dashboard */}
+          <a href="/dashboard" className="ml-auto btn btn--soft h-11 min-h-0 px-3.5 shrink-0" aria-label="Xem lời chúc">
+            <Heart className="w-4 h-4 text-red-600" /> <span className="hidden sm:inline">Lời chúc</span>
+          </a>
+          <div className="hidden lg:flex items-center gap-2">
             <button onClick={onPreview} className="btn btn--soft h-11 min-h-0">
               <Eye className="w-4 h-4" /> Xem như khách
             </button>

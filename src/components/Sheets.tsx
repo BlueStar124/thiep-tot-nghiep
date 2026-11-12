@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { X, MessageCircle, Copy, Check, Lock, ExternalLink } from 'lucide-react'
+import { X, Copy, Check, Lock, ExternalLink, Send } from 'lucide-react'
 import type { Invitation } from '../config/invitation'
-import { rsvpMessage } from '../lib/invite-tools'
-import { publishInvite, inviteUrl } from '../lib/api'
+import { publishInvite, inviteUrl, sendWish } from '../lib/api'
 import type { Guest } from '../lib/slug'
 
 export const Sheet: React.FC<{ open: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ open, onClose, title, children }) => {
@@ -36,67 +35,119 @@ export const Sheet: React.FC<{ open: boolean; onClose: () => void; title: string
 export const field = 'w-full h-12 rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] text-slate-900 outline-none focus:border-red-400 focus:bg-white transition'
 export const label = 'block text-[13px] font-semibold text-slate-600 mb-1.5'
 
-export const RsvpSheet: React.FC<{ open: boolean; onClose: () => void; invitation: Invitation; defaultName?: string }> = ({ open, onClose, invitation, defaultName }) => {
+/** Đã gửi lời chúc cho thiệp này trên máy này chưa (để đổi chữ nút thành "Đã gửi") */
+export const wishSentKey = (slug: string) => `huit_wish_sent_${slug.toLowerCase()}`
+
+type RsvpState = { status: 'form' } | { status: 'sending' } | { status: 'done' } | { status: 'error'; message: string }
+
+/**
+ * Khách xác nhận tham dự & gửi lời chúc: lưu thẳng vào database của thiệp,
+ * chủ thiệp xem ở trang /dashboard. Không mở SMS / Zalo.
+ */
+export const RsvpSheet: React.FC<{
+  open: boolean
+  onClose: () => void
+  invitation: Invitation
+  defaultName?: string
+  /** Tên link thiệp + tên khách trên link; thiếu slug = đang xem trước, không gửi thật */
+  slug?: string
+  guestSlug?: string
+  onSent?: () => void
+}> = ({ open, onClose, invitation, defaultName, slug, guestSlug, onSent }) => {
   const [name, setName] = useState(defaultName ?? '')
   const [going, setGoing] = useState(true)
   const [people, setPeople] = useState(1)
   const [wish, setWish] = useState('')
-  const [copied, setCopied] = useState(false)
-  const msg = rsvpMessage(invitation, { name: name || 'bạn của bạn', going, people, wish })
-  const phone = invitation.phone.replace(/\D/g, '')
+  const [trap, setTrap] = useState('')
+  const [state, setState] = useState<RsvpState>({ status: 'form' })
+  const host = invitation.graduateName.trim().split(/\s+/).pop() ?? ''
 
-  const copyAndZalo = async () => {
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!slug) return setState({ status: 'error', message: 'Đây là bản xem trước, lời chúc chưa được gửi đi.' })
+    if (!name.trim()) return setState({ status: 'error', message: 'Bạn ghi tên giúp mình nhé.' })
+    setState({ status: 'sending' })
     try {
-      await navigator.clipboard.writeText(msg)
-      setCopied(true)
-    } catch {
-      // trình duyệt chặn clipboard – vẫn mở Zalo
+      await sendWish(slug, guestSlug, { name: name.trim(), attending: going, people: going ? people : 0, message: wish.trim(), website: trap })
+      try {
+        localStorage.setItem(wishSentKey(slug), '1')
+      } catch {
+        // bỏ qua
+      }
+      setState({ status: 'done' })
+      onSent?.()
+    } catch (err) {
+      setState({ status: 'error', message: (err as Error).message })
     }
-    window.open(`https://zalo.me/${phone}`, '_blank', 'noopener')
+  }
+
+  const close = () => {
+    onClose()
+    if (state.status === 'done') {
+      setState({ status: 'form' })
+      setWish('')
+    }
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title="Xác nhận tham dự">
-      <div className="space-y-4">
-        <div>
-          <label className={label} htmlFor="rsvp-name">Tên của bạn</label>
-          <input id="rsvp-name" className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ví dụ: Cô Lan, bạn Tuấn…" />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {[true, false].map((v) => (
-            <button
-              key={String(v)}
-              onClick={() => setGoing(v)}
-              className={`h-12 rounded-2xl font-semibold text-[15px] border transition ${going === v ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-700 border-slate-200'}`}
-            >
-              {v ? 'Mình sẽ đến' : 'Tiếc quá, bận rồi'}
-            </button>
-          ))}
-        </div>
-        {going && (
-          <div>
-            <span className={label}>Số người đi cùng (tính cả bạn)</span>
-            <div className="flex items-center gap-3">
-              <button className="w-12 h-12 rounded-2xl bg-slate-100 text-xl font-bold" onClick={() => setPeople((n) => Math.max(1, n - 1))} aria-label="Bớt">−</button>
-              <span className="w-10 text-center text-lg font-bold">{people}</span>
-              <button className="w-12 h-12 rounded-2xl bg-slate-100 text-xl font-bold" onClick={() => setPeople((n) => Math.min(10, n + 1))} aria-label="Thêm">+</button>
-            </div>
+    <Sheet open={open} onClose={close} title="Xác nhận tham dự">
+      {state.status === 'done' ? (
+        <div className="py-4 text-center">
+          <div className="mx-auto w-14 h-14 rounded-full bg-[#f4d23a] border-2 border-[#111] flex items-center justify-center">
+            <Check className="w-7 h-7" />
           </div>
-        )}
-        <div>
-          <label className={label} htmlFor="rsvp-wish">Lời chúc</label>
-          <textarea id="rsvp-wish" className={`${field} h-24 py-3 resize-none`} value={wish} onChange={(e) => setWish(e.target.value)} placeholder="Chúc mừng tân cử nhân…" />
-        </div>
-        <div className="rounded-2xl bg-slate-50 p-3 text-[13px] text-slate-600 leading-relaxed">{msg}</div>
-        <div className="grid gap-2">
-          <a href={`sms:${phone}?&body=${encodeURIComponent(msg)}`} className="h-12 rounded-2xl bg-[#e11d48] text-white font-bold flex items-center justify-center gap-2">
-            <MessageCircle className="w-5 h-5" /> Gửi tin nhắn SMS
-          </a>
-          <button onClick={copyAndZalo} className="h-12 rounded-2xl bg-[#0068ff] text-white font-bold flex items-center justify-center gap-2">
-            {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />} {copied ? 'Đã chép – dán vào Zalo' : 'Chép lời nhắn & mở Zalo'}
+          <p className="mt-4 text-[20px] font-black uppercase">Đã gửi tới {host}!</p>
+          <p className="mt-2 text-[15px] text-[#333] leading-relaxed">{going ? `Cảm ơn ${name.trim()} – hẹn gặp bạn ở buổi lễ nhé.` : `Cảm ơn ${name.trim()} đã gửi lời chúc.`}</p>
+          <button onClick={close} className="zine-btn zine-btn--yellow w-full mt-6">
+            Đóng
           </button>
         </div>
-      </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className={label} htmlFor="rsvp-name">Tên của bạn</label>
+            <input id="rsvp-name" className={field} value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Ví dụ: Cô Lan, bạn Tuấn…" />
+          </div>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Bạn có đến không">
+            {[true, false].map((v) => (
+              <button
+                type="button"
+                role="radio"
+                aria-checked={going === v}
+                key={String(v)}
+                onClick={() => setGoing(v)}
+                className={`h-12 rounded-xl font-bold text-[15px] border-2 border-[#111] transition ${going === v ? 'bg-[#111] text-white' : 'bg-white text-[#111]'}`}
+              >
+                {v ? 'Mình sẽ đến' : 'Tiếc quá, bận rồi'}
+              </button>
+            ))}
+          </div>
+          {going && (
+            <div>
+              <span className={label}>Số người đi (tính cả bạn)</span>
+              <div className="flex items-center gap-3">
+                <button type="button" className="zine-icon-btn text-xl font-bold" onClick={() => setPeople((n) => Math.max(1, n - 1))} aria-label="Bớt">−</button>
+                <span className="w-10 text-center text-lg font-black tabular-nums">{people}</span>
+                <button type="button" className="zine-icon-btn text-xl font-bold" onClick={() => setPeople((n) => Math.min(10, n + 1))} aria-label="Thêm">+</button>
+              </div>
+            </div>
+          )}
+          <div>
+            <label className={label} htmlFor="rsvp-wish">Lời chúc</label>
+            <textarea id="rsvp-wish" className={`${field} h-28 py-3 resize-none`} value={wish} maxLength={600} onChange={(e) => setWish(e.target.value)} placeholder="Chúc mừng tân cử nhân…" />
+          </div>
+          {/* Ô bẫy: người không thấy, máy spam tự điền → bị bỏ qua */}
+          <input type="text" name="website" value={trap} onChange={(e) => setTrap(e.target.value)} tabIndex={-1} autoComplete="off" aria-hidden className="absolute -left-[9999px] w-px h-px opacity-0" />
+          {state.status === 'error' && (
+            <p role="alert" className="rounded-lg border-2 border-[#b91c1c] bg-[#fdecec] px-3 py-2 text-[14px] font-semibold text-[#b91c1c]">
+              {state.message}
+            </p>
+          )}
+          <button type="submit" disabled={state.status === 'sending'} className="zine-btn zine-btn--yellow w-full disabled:opacity-60">
+            <Send className="w-5 h-5" /> {state.status === 'sending' ? 'Đang gửi…' : 'Gửi lời chúc'}
+          </button>
+        </form>
+      )}
     </Sheet>
   )
 }

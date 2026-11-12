@@ -8,7 +8,27 @@ import { assignGuestSlugs, ownerSlugFrom, slugDisplay, SLUG_RE, RESERVED_SLUGS, 
 export interface KV {
   get(key: string): Promise<string | null>
   set(key: string, value: string): Promise<void>
+  /** Danh sách (lời chúc): thêm vào đầu, đọc tối đa max phần tử mới nhất, xoá đúng 1 phần tử */
+  push(key: string, value: string): Promise<void>
+  list(key: string, max: number): Promise<string[]>
+  remove(key: string, value: string): Promise<void>
 }
+
+/** Một lời chúc khách gửi từ trang thiệp */
+export interface Wish {
+  id: string
+  /** Tên khách tự ghi */
+  name: string
+  /** Tên trên link riêng (nếu mở bằng link riêng), để biết chính xác ai gửi */
+  guestName?: string
+  attending: boolean
+  /** Số người đi (tính cả khách), 0 nếu không đi */
+  people: number
+  message: string
+  at: number
+}
+
+const MAX_WISHES = 1000
 
 interface StoredInvite {
   /** Khoá lưu trong database: chữ thường */
@@ -79,6 +99,14 @@ async function checkPassword(auth: Auth, given: unknown): Promise<ApiResult | nu
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
   return diff === 0 ? null : { status: 401, body: { error: 'Sai mật khẩu' } }
 }
+
+/**
+ * Lời chúc gắn với thiệp theo mã băm khoá gốc (không đổi khi đổi tên link),
+ * nên đổi XuanCuong → tên khác vẫn giữ nguyên lời chúc.
+ */
+const WISH_KEY = (rec: StoredInvite) => `wishes:${rec.keyHash.slice(0, 16)}`
+
+const cleanText = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '')
 
 function randomKey() {
   const bytes = crypto.getRandomValues(new Uint8Array(18))
@@ -156,12 +184,59 @@ function checkSlug(raw: string): { display: string; key: string } | string {
  *  - Tạo mới:   { password, invitation, guests: string[], desiredSlug? } → trả về slug + editKey (chỉ trả 1 lần)
  *  - Cập nhật:  { slug, editKey, invitation, guests, newSlug? } → cần đúng khoá sửa; newSlug = đổi tên link
  *  - Hỏi lại:   { action: 'resolve', slug, editKey } → tên link hiện tại (khi đã đổi tên ở nơi khác)
+ *  - Lời chúc:  { action: 'wish', slug, guest?, name, attending, people, message } (khách gửi)
+ *               { action: 'wishes' | 'deleteWish', slug, editKey, id? } (chủ thiệp xem / xoá)
  *  - Đăng nhập: { action: 'login', password, slug? } → mở trình tạo thiệp; có slug thì cấp khoá sửa mới cho máy này
  */
 export async function saveInvite(kv: KV, payload: unknown, auth: Auth = 'open'): Promise<ApiResult> {
   if (!payload || typeof payload !== 'object') return { status: 400, body: { error: 'Dữ liệu không hợp lệ' } }
   const p = payload as Record<string, unknown>
   const now = Date.now()
+
+  // Khách gửi lời chúc (không cần đăng nhập)
+  if (p.action === 'wish') {
+    if (typeof p.website === 'string' && p.website) return { status: 200, body: { ok: true } } // ô bẫy chống máy spam
+    if (typeof p.slug !== 'string' || !SLUG_RE.test(p.slug.toLowerCase())) return { status: 400, body: { error: 'Link không hợp lệ' } }
+    const rec = await readInvite(kv, p.slug)
+    if (!rec) return { status: 404, body: { error: 'Không tìm thấy thiệp' } }
+    const name = cleanText(p.name, 60)
+    const message = typeof p.message === 'string' ? p.message.trim().slice(0, 600) : ''
+    if (!name) return { status: 400, body: { error: 'Bạn ghi tên giúp mình nhé' } }
+    const attending = p.attending === true
+    const people = attending ? Math.min(10, Math.max(1, Math.round(Number(p.people) || 1))) : 0
+    const guest = typeof p.guest === 'string' ? rec.guests.find((g) => g.slug === p.guest) : undefined
+    const wish: Wish = { id: randomKey().slice(0, 12), name, guestName: guest?.name, attending, people, message, at: now }
+    await kv.push(WISH_KEY(rec), JSON.stringify(wish))
+    return { status: 201, body: { ok: true } }
+  }
+
+  // Chủ thiệp xem / xoá lời chúc
+  if (p.action === 'wishes' || p.action === 'deleteWish') {
+    if (typeof p.slug !== 'string') return { status: 400, body: { error: 'Thiếu thông tin' } }
+    const rec = await readInvite(kv, p.slug, true)
+    if (!rec) return { status: 404, body: { error: 'Không tìm thấy thiệp' } }
+    if (!(await ownsKey(rec, p.editKey))) return { status: 403, body: { error: 'Không có quyền xem lời chúc' } }
+    const raw = await kv.list(WISH_KEY(rec), MAX_WISHES)
+    if (p.action === 'deleteWish') {
+      const hit = raw.find((r) => {
+        try {
+          return (JSON.parse(r) as Wish).id === p.id
+        } catch {
+          return false
+        }
+      })
+      if (hit) await kv.remove(WISH_KEY(rec), hit)
+      return { status: 200, body: { ok: true } }
+    }
+    const wishes = raw.flatMap((r) => {
+      try {
+        return [JSON.parse(r) as Wish]
+      } catch {
+        return []
+      }
+    })
+    return { status: 200, body: { wishes } }
+  }
 
   // Chủ thiệp nhập mật khẩu → mở trình tạo thiệp; có tên link thì cấp khoá sửa mới cho máy này
   if (p.action === 'login') {

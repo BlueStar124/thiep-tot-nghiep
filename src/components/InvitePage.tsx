@@ -3,7 +3,7 @@ import { Map as MapIcon, Navigation, Send, Volume2, VolumeX, ArrowUpDown, Chevro
 import { CollageInvite } from './CollageInvite'
 import { Countdown } from './Countdown'
 import { FitText } from './ui/FitText'
-import { RsvpSheet } from './Sheets'
+import { RsvpSheet, wishSentKey } from './Sheets'
 import { SCHOOL, formatCeremony, type Invitation } from '../config/invitation'
 import { soundEngine } from '../lib/music'
 
@@ -14,6 +14,9 @@ interface Props {
   celebrate?: boolean
   /** Chừa chỗ dưới cùng (khi có nút nổi "Quay lại chỉnh sửa") */
   bottomSpace?: boolean
+  /** Tên link thiệp + khách: để lời chúc lưu đúng thiệp. Thiếu = xem trước, không gửi thật */
+  slug?: string
+  guestSlug?: string
 }
 
 /** Pháo giấy: thư viện chỉ tải khi cần, không nằm trong lần tải đầu của trang */
@@ -51,8 +54,15 @@ function MusicButton() {
 }
 
 /** Trang khách mở link – cùng phong cách với thiệp collage: giấy xám, viền đen, nhãn pill */
-export const InvitePage: React.FC<Props> = ({ inv, guestName, onOpenMap, celebrate = true, bottomSpace = false }) => {
+export const InvitePage: React.FC<Props> = ({ inv, guestName, onOpenMap, celebrate = true, bottomSpace = false, slug, guestSlug }) => {
   const [rsvpOpen, setRsvpOpen] = useState(false)
+  const [sent, setSent] = useState(() => {
+    try {
+      return !!slug && localStorage.getItem(wishSentKey(slug)) === '1'
+    } catch {
+      return false
+    }
+  })
   const c = formatCeremony(inv)
   const phone = inv.phone.replace(/(\d{4})(\d{3})(\d+)/, '$1 $2 $3')
   useCelebrate(celebrate)
@@ -122,7 +132,7 @@ export const InvitePage: React.FC<Props> = ({ inv, guestName, onOpenMap, celebra
 
             <div className="space-y-3 pt-1">
               <button onClick={() => setRsvpOpen(true)} className="zine-btn zine-btn--yellow w-full text-[clamp(14px,4.2vw,16px)]">
-                <Send className="w-5 h-5 shrink-0" /> Xác nhận tham dự & gửi lời chúc
+                <Send className="w-5 h-5 shrink-0" /> {sent ? 'Đã gửi lời chúc · Gửi thêm' : 'Xác nhận tham dự & gửi lời chúc'}
               </button>
               <a href={SCHOOL.mapsUrl} target="_blank" rel="noopener noreferrer" className="zine-btn w-full text-[15px]">
                 <Navigation className="w-4 h-4" /> Chỉ đường Google Maps
@@ -134,7 +144,7 @@ export const InvitePage: React.FC<Props> = ({ inv, guestName, onOpenMap, celebra
         </div>
       </div>
 
-      <RsvpSheet open={rsvpOpen} onClose={() => setRsvpOpen(false)} invitation={inv} defaultName={guestName} />
+      <RsvpSheet open={rsvpOpen} onClose={() => setRsvpOpen(false)} invitation={inv} defaultName={guestName} slug={slug} guestSlug={guestSlug} onSent={() => setSent(true)} />
     </div>
   )
 }

@@ -74,10 +74,3 @@ export function useCountdown(inv: Invitation) {
     done: diff === 0
   }
 }
-
-export function rsvpMessage(inv: Invitation, r: { name: string; going: boolean; people: number; wish: string }) {
-  const c = formatCeremony(inv)
-  return r.going
-    ? `Chúc mừng ${inv.graduateName}! Mình là ${r.name}, sẽ đến dự lễ tốt nghiệp lúc ${c.time} ${c.weekday} ${c.date} (${r.people} người). ${r.wish}`.trim()
-    : `Chúc mừng ${inv.graduateName}! Mình là ${r.name}, tiếc là không đến dự được. ${r.wish}`.trim()
-}
