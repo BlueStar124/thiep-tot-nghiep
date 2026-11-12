@@ -52,6 +52,10 @@ function localInviteApi(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), localInviteApi()],
+  build: {
+    // Phần lớn nhất là bản đồ 3D (three.js ~585 kB, gzip ~150 kB), chỉ tải khi khách bấm mở bản đồ
+    chunkSizeWarningLimit: 700
+  },
   server: {
     port: 3000,
     host: true,

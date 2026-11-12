@@ -1,0 +1,15 @@
+{
+  // Vercel dịch hàm trong api/ bằng tsconfig gần nhất: dùng kiểu Node, không dùng 'vite/client' của phần web
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "strict": true,
+    "verbatimModuleSyntax": false,
+    "isolatedModules": true
+  },
+  "include": ["./**/*.ts", "../server/**/*.ts", "../src/lib/slug.ts"]
+}
