@@ -25,10 +25,12 @@ export function slugDisplay(input: string, max = 40): string {
     .replace(/-+$/g, '')
 }
 
-/** Gợi ý tên link thiệp từ họ tên: lấy tên gọi (chữ cuối), ví dụ "Nguyễn Văn Minh" → "minh" */
+/** Gợi ý tên link thiệp từ họ tên: tên đệm + tên viết liền, ví dụ "Nguyễn Xuân Cường" → "XuanCuong" */
 export function ownerSlugFrom(fullName: string): string {
   const words = fullName.trim().split(/\s+/).filter(Boolean)
-  return slugify(words[words.length - 1] ?? '') || 'thiep'
+  const pick = words.length > 2 ? words.slice(-2) : words
+  const name = pick.map((w) => slugDisplay(w).replace(/-/g, '')).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('')
+  return name.slice(0, 40) || 'thiep'
 }
 
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/
