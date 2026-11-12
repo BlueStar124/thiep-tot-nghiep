@@ -18,9 +18,18 @@ interface StoredInvite {
   invitation: Record<string, string | number>
   guests: Guest[]
   keyHash: string
+  /** Khoá sửa cấp thêm khi chủ thiệp đăng nhập bằng mật khẩu trên máy khác (giữ 5 khoá gần nhất) */
+  extraKeyHashes?: string[]
   createdAt: number
   updatedAt: number
 }
+
+/**
+ * Mật khẩu chủ thiệp (biến môi trường ADMIN_PASSWORD trên Vercel):
+ *  - 'open'        : chạy thử trên máy, không cần mật khẩu
+ *  - { password }  : cần đúng mật khẩu để tạo thiệp / lấy lại quyền sửa; password trống = chưa đặt → khoá hết
+ */
+export type Auth = 'open' | { password?: string }
 
 export interface ApiResult {
   status: number
@@ -51,6 +60,24 @@ const TEXT_FIELDS: Record<string, number> = {
 async function sha256(text: string) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Có phải khoá sửa của thiệp này không */
+async function ownsKey(rec: StoredInvite, editKey: unknown) {
+  if (typeof editKey !== 'string' || !editKey) return false
+  const h = await sha256(editKey)
+  return h === rec.keyHash || (rec.extraKeyHashes ?? []).includes(h)
+}
+
+/** So mật khẩu qua mã băm, so từng ký tự đủ cả chuỗi để thời gian so sánh không lộ ký tự đúng */
+async function checkPassword(auth: Auth, given: unknown): Promise<ApiResult | null> {
+  if (auth === 'open') return null
+  if (!auth.password) return { status: 503, body: { error: 'Chưa đặt mật khẩu chủ thiệp (ADMIN_PASSWORD) trên Vercel' } }
+  if (typeof given !== 'string' || given.length > 200) return { status: 401, body: { error: 'Sai mật khẩu' } }
+  const [a, b] = await Promise.all([sha256('huit:' + given), sha256('huit:' + auth.password)])
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0 ? null : { status: 401, body: { error: 'Sai mật khẩu' } }
 }
 
 function randomKey() {
@@ -103,12 +130,16 @@ async function readInvite(kv: KV, slug: string, forOwner = false): Promise<Store
   return null
 }
 
-/** GET /api/invite?slug=XuanCuong → nội dung thiệp + danh sách khách (không kèm khoá sửa) */
-export async function getInvite(kv: KV, slug: string | null): Promise<ApiResult> {
+/**
+ * GET /api/invite?slug=XuanCuong&guest=co-lan → nội dung thiệp + đúng khách đó.
+ * Không trả cả danh sách khách: người có link không xem được còn mời những ai.
+ */
+export async function getInvite(kv: KV, slug: string | null, guestSlug?: string | null): Promise<ApiResult> {
   if (!slug || !SLUG_RE.test(slug.toLowerCase())) return { status: 400, body: { error: 'Link không hợp lệ' } }
   const rec = await readInvite(kv, slug)
   if (!rec) return { status: 404, body: { error: 'Không tìm thấy thiệp' } }
-  return { status: 200, body: { slug: shown(rec), invitation: rec.invitation, guests: rec.guests } }
+  const guest = guestSlug ? rec.guests.find((g) => g.slug === guestSlug.toLowerCase()) : undefined
+  return { status: 200, body: { slug: shown(rec), invitation: rec.invitation, guests: guest ? [guest] : [] } }
 }
 
 /** Kiểm tra tên link mới: hợp lệ, không trùng từ khoá hệ thống */
@@ -122,21 +153,34 @@ function checkSlug(raw: string): { display: string; key: string } | string {
 
 /**
  * POST /api/invite
- *  - Tạo mới:   { invitation, guests: string[], desiredSlug? } → trả về slug + editKey (chỉ trả 1 lần)
+ *  - Tạo mới:   { password, invitation, guests: string[], desiredSlug? } → trả về slug + editKey (chỉ trả 1 lần)
  *  - Cập nhật:  { slug, editKey, invitation, guests, newSlug? } → cần đúng khoá sửa; newSlug = đổi tên link
  *  - Hỏi lại:   { action: 'resolve', slug, editKey } → tên link hiện tại (khi đã đổi tên ở nơi khác)
+ *  - Đăng nhập: { action: 'login', password, slug? } → mở trình tạo thiệp; có slug thì cấp khoá sửa mới cho máy này
  */
-export async function saveInvite(kv: KV, payload: unknown): Promise<ApiResult> {
+export async function saveInvite(kv: KV, payload: unknown, auth: Auth = 'open'): Promise<ApiResult> {
   if (!payload || typeof payload !== 'object') return { status: 400, body: { error: 'Dữ liệu không hợp lệ' } }
   const p = payload as Record<string, unknown>
   const now = Date.now()
+
+  // Chủ thiệp nhập mật khẩu → mở trình tạo thiệp; có tên link thì cấp khoá sửa mới cho máy này
+  if (p.action === 'login') {
+    const denied = await checkPassword(auth, p.password)
+    if (denied) return denied
+    const rec = typeof p.slug === 'string' && SLUG_RE.test(p.slug.toLowerCase()) ? await readInvite(kv, p.slug, true) : null
+    if (!rec) return { status: 200, body: { ok: true } }
+    const editKey = randomKey()
+    const extraKeyHashes = [...(rec.extraKeyHashes ?? []), await sha256(editKey)].slice(-5)
+    await kv.set(KEY(rec.slug), JSON.stringify({ ...rec, extraKeyHashes } satisfies StoredInvite))
+    return { status: 200, body: { ok: true, slug: shown(rec), editKey, invitation: rec.invitation, guests: rec.guests } }
+  }
 
   // Chủ thiệp hỏi tên link hiện tại
   if (p.action === 'resolve') {
     if (typeof p.slug !== 'string' || typeof p.editKey !== 'string') return { status: 400, body: { error: 'Thiếu thông tin' } }
     const rec = await readInvite(kv, p.slug, true)
     if (!rec) return { status: 404, body: { error: 'Không tìm thấy thiệp' } }
-    if ((await sha256(p.editKey)) !== rec.keyHash) return { status: 403, body: { error: 'Không có quyền sửa thiệp này' } }
+    if (!(await ownsKey(rec, p.editKey))) return { status: 403, body: { error: 'Không có quyền sửa thiệp này' } }
     return { status: 200, body: { slug: shown(rec) } }
   }
 
@@ -151,7 +195,7 @@ export async function saveInvite(kv: KV, payload: unknown): Promise<ApiResult> {
   if (typeof p.slug === 'string' && p.slug) {
     const rec = await readInvite(kv, p.slug, true)
     if (!rec) return { status: 404, body: { error: 'Không tìm thấy thiệp để cập nhật' } }
-    if (typeof p.editKey !== 'string' || (await sha256(p.editKey)) !== rec.keyHash) return { status: 403, body: { error: 'Không có quyền sửa thiệp này' } }
+    if (!(await ownsKey(rec, p.editKey))) return { status: 403, body: { error: 'Không có quyền sửa thiệp này' } }
 
     let next: StoredInvite = { ...rec, invitation, guests, updatedAt: now }
     if (typeof p.newSlug === 'string' && p.newSlug.trim()) {
@@ -168,7 +212,9 @@ export async function saveInvite(kv: KV, payload: unknown): Promise<ApiResult> {
     return { status: 200, body: { slug: shown(next), guests } }
   }
 
-  // Tạo mới: tìm tên link còn trống (XuanCuong, XuanCuong-2, …)
+  // Tạo mới: chỉ chủ thiệp (đúng mật khẩu); tìm tên link còn trống (XuanCuong, XuanCuong-2, …)
+  const denied = await checkPassword(auth, p.password)
+  if (denied) return denied
   const wanted = typeof p.desiredSlug === 'string' ? checkSlug(p.desiredSlug) : null
   const base = wanted && typeof wanted !== 'string' ? wanted.display : ownerSlugFrom(String(invitation.graduateName))
   let display = ''

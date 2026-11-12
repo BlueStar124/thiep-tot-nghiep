@@ -7,7 +7,8 @@ import { invitationFromUrl } from './lib/invite-tools'
 // Tải chậm: khách mở link chỉ cần trang thiệp; trình tạo thiệp và bản đồ 3D tải khi dùng tới
 const Editor = lazy(() => import('./components/Editor').then((m) => ({ default: m.Editor })))
 const MapTour = lazy(() => import('./components/MapTour').then((m) => ({ default: m.MapTour })))
-import { fetchInvite } from './lib/api'
+const LockScreen = lazy(() => import('./components/LockScreen').then((m) => ({ default: m.LockScreen })))
+import { fetchInvite, isUnlocked } from './lib/api'
 
 /**
  * - /minh/co-lan → thiệp của Minh gửi riêng Cô Lan (đọc từ database)
@@ -30,6 +31,8 @@ export const App: React.FC = () => {
   const [inv, setInv] = useState<Invitation>(() => (legacy.current ? { ...DEFAULT_INVITATION, ...legacy.current } : loadInvitation()))
   const [guest, setGuest] = useState<GuestState>(() => (legacy.current ? { status: 'ready', inv: { ...DEFAULT_INVITATION, ...legacy.current } } : { status: 'loading' }))
   const [preview, setPreview] = useState(false)
+  // Trang chính (trình tạo thiệp) chỉ dành cho chủ thiệp: cần mật khẩu hoặc khoá sửa đã lưu trên máy
+  const [unlocked, setUnlocked] = useState(isUnlocked)
   const [mapOpen, setMapOpen] = useState(false)
 
   // Khách mở link /ten-thiep/ten-khach → tải thiệp từ máy chủ
@@ -37,7 +40,7 @@ export const App: React.FC = () => {
     const { slug, guestSlug } = route.current
     if (!slug || legacy.current) return
     let alive = true
-    fetchInvite(slug)
+    fetchInvite(slug, guestSlug)
       .then((data) => {
         if (!alive) return
         const invitation = { ...DEFAULT_INVITATION, ...data.invitation }
@@ -80,6 +83,19 @@ export const App: React.FC = () => {
     if (guest.status === 'ready') return <InvitePage inv={guest.inv} guestName={guest.guestName} onOpenMap={openMap} />
     return <GuestStatus state={guest} />
   }
+
+  if (!unlocked)
+    return (
+      <Suspense fallback={<Loading text="Đang mở…" />}>
+        <LockScreen
+          graduateName={inv.graduateName}
+          onUnlock={(loaded) => {
+            if (loaded) change({ ...DEFAULT_INVITATION, ...loaded })
+            setUnlocked(true)
+          }}
+        />
+      </Suspense>
+    )
 
   if (preview)
     return (

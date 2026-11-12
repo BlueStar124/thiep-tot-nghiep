@@ -2,9 +2,10 @@
  * Vercel Function: lưu & đọc thiệp trên Upstash Redis.
  * Bật 1 lần: Vercel → Project → Storage → Upstash (Redis) → Connect.
  * Vercel tự thêm biến môi trường KV_REST_API_URL / KV_REST_API_TOKEN (hoặc UPSTASH_REDIS_REST_URL / _TOKEN).
+ * Tự thêm ADMIN_PASSWORD (Settings → Environment Variables): mật khẩu mở trình tạo thiệp.
  */
 import { Redis } from '@upstash/redis'
-import { getInvite, saveInvite, type ApiResult, type KV } from '../server/invite-store.js'
+import { getInvite, saveInvite, type ApiResult, type Auth, type KV } from '../server/invite-store.js'
 
 function kv(): KV | null {
   const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
@@ -27,9 +28,9 @@ const notConfigured = () => json({ status: 503, body: { error: 'Chưa bật data
 export async function GET(request: Request) {
   const store = kv()
   if (!store) return notConfigured()
-  const slug = new URL(request.url).searchParams.get('slug')
+  const params = new URL(request.url).searchParams
   // Cho CDN giữ 30 giây: khách mở cùng lúc không phải gọi database nhiều lần
-  return json(await getInvite(store, slug), 'public, s-maxage=30, stale-while-revalidate=300')
+  return json(await getInvite(store, params.get('slug'), params.get('guest')), 'public, s-maxage=30, stale-while-revalidate=300')
 }
 
 export async function POST(request: Request) {
@@ -43,5 +44,6 @@ export async function POST(request: Request) {
   } catch {
     return json({ status: 400, body: { error: 'Dữ liệu không hợp lệ' } })
   }
-  return json(await saveInvite(store, payload))
+  const auth: Auth = { password: process.env.ADMIN_PASSWORD?.trim() || undefined }
+  return json(await saveInvite(store, payload, auth))
 }

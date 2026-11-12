@@ -33,12 +33,14 @@ function localInviteApi(): Plugin {
           let text = ''
           for await (const chunk of req) text += chunk
           try {
-            result = await saveInvite(kv, JSON.parse(text))
+            // Trên máy: không cần mật khẩu, trừ khi chạy với ADMIN_PASSWORD=… để thử màn khoá
+            result = await saveInvite(kv, JSON.parse(text), process.env.ADMIN_PASSWORD ? { password: process.env.ADMIN_PASSWORD } : 'open')
           } catch {
             result = { status: 400, body: { error: 'Dữ liệu không hợp lệ' } }
           }
         } else {
-          result = await getInvite(kv, new URL(req.url ?? '', 'http://x').searchParams.get('slug'))
+          const params = new URL(req.url ?? '', 'http://x').searchParams
+          result = await getInvite(kv, params.get('slug'), params.get('guest'))
         }
         res.statusCode = result.status
         res.setHeader('content-type', 'application/json; charset=utf-8')

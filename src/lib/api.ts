@@ -15,6 +15,21 @@ export interface Owner {
 
 const OWNER_KEY = 'huit_owner_v1'
 const GUESTS_KEY = 'huit_guests_v1'
+/** Mật khẩu chủ thiệp – chỉ giữ trong phiên (đóng tab là quên), dùng khi tạo thiệp mới */
+const ADMIN_KEY = 'huit_admin_v1'
+
+function adminPassword(): string | undefined {
+  try {
+    return sessionStorage.getItem(ADMIN_KEY) ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Máy này được vào trình tạo thiệp chưa: đã có khoá sửa thiệp, hoặc vừa nhập đúng mật khẩu */
+export function isUnlocked() {
+  return !!loadOwner() || !!adminPassword()
+}
 
 export function loadOwner(): Owner | null {
   try {
@@ -62,8 +77,32 @@ async function call<T>(input: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
-export function fetchInvite(slug: string) {
-  return call<PublishedInvite>(`/api/invite?slug=${encodeURIComponent(slug)}`)
+/** Khách mở link: chỉ hỏi đúng tên mình, máy chủ không trả cả danh sách khách */
+export function fetchInvite(slug: string, guestSlug?: string) {
+  const q = `slug=${encodeURIComponent(slug)}${guestSlug ? `&guest=${encodeURIComponent(guestSlug)}` : ''}`
+  return call<PublishedInvite>(`/api/invite?${q}`)
+}
+
+/**
+ * Chủ thiệp nhập mật khẩu. Nếu đã có thiệp ở tên link này → máy này được cấp quyền sửa,
+ * nội dung thiệp + danh sách khách được tải về để sửa tiếp.
+ */
+export async function login(password: string, slug?: string): Promise<{ invitation?: Partial<Invitation> }> {
+  const res = await call<{ ok: true; slug?: string; editKey?: string; invitation?: Partial<Invitation>; guests?: Guest[] }>('/api/invite', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'login', password, slug: slug || undefined })
+  })
+  try {
+    sessionStorage.setItem(ADMIN_KEY, password)
+  } catch {
+    // bỏ qua
+  }
+  if (res.slug && res.editKey) {
+    saveOwner({ slug: res.slug, editKey: res.editKey })
+    saveGuestNames((res.guests ?? []).map((g) => g.name))
+  }
+  return { invitation: res.invitation }
 }
 
 /** Lưu thiệp lên máy chủ: lần đầu tạo link mới, các lần sau cập nhật đúng link cũ */
@@ -77,12 +116,14 @@ export async function publishInvite(invitation: Invitation, guestNames: string[]
     })
   let res
   try {
-    res = owner ? await post({ slug: owner.slug, editKey: owner.editKey, invitation, guests: guestNames, newSlug }) : await post({ desiredSlug, invitation, guests: guestNames })
+    res = owner
+      ? await post({ slug: owner.slug, editKey: owner.editKey, invitation, guests: guestNames, newSlug })
+      : await post({ desiredSlug, invitation, guests: guestNames, password: adminPassword() })
   } catch (err) {
     // Thiệp cũ không còn trên máy chủ → tạo link mới, giữ tên link cũ nếu còn trống
     if (owner && (err as { status?: number }).status === 404) {
       forgetOwner()
-      res = await post({ desiredSlug: owner.slug, invitation, guests: guestNames })
+      res = await post({ desiredSlug: owner.slug, invitation, guests: guestNames, password: adminPassword() })
     } else throw err
   }
   if (res.editKey) saveOwner({ slug: res.slug, editKey: res.editKey })
