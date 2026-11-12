@@ -1,0 +1,47 @@
+/**
+ * Vercel Function: lưu & đọc thiệp trên Upstash Redis.
+ * Bật 1 lần: Vercel → Project → Storage → Upstash (Redis) → Connect.
+ * Vercel tự thêm biến môi trường KV_REST_API_URL / KV_REST_API_TOKEN (hoặc UPSTASH_REDIS_REST_URL / _TOKEN).
+ */
+import { Redis } from '@upstash/redis'
+import { getInvite, saveInvite, type ApiResult, type KV } from '../server/invite-store'
+
+function kv(): KV | null {
+  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
+  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!url || !token) return null
+  const redis = new Redis({ url, token, automaticDeserialization: false })
+  return {
+    get: async (key) => (await redis.get<string>(key)) ?? null,
+    set: async (key, value) => {
+      await redis.set(key, value)
+    }
+  }
+}
+
+const json = ({ status, body }: ApiResult, cache = 'no-store') =>
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': cache } })
+
+const notConfigured = () => json({ status: 503, body: { error: 'Chưa bật database Upstash trên Vercel' } })
+
+export async function GET(request: Request) {
+  const store = kv()
+  if (!store) return notConfigured()
+  const slug = new URL(request.url).searchParams.get('slug')
+  // Cho CDN giữ 30 giây: khách mở cùng lúc không phải gọi database nhiều lần
+  return json(await getInvite(store, slug), 'public, s-maxage=30, stale-while-revalidate=300')
+}
+
+export async function POST(request: Request) {
+  const store = kv()
+  if (!store) return notConfigured()
+  const text = await request.text()
+  if (text.length > 40_000) return json({ status: 413, body: { error: 'Dữ liệu quá lớn' } })
+  let payload: unknown
+  try {
+    payload = JSON.parse(text)
+  } catch {
+    return json({ status: 400, body: { error: 'Dữ liệu không hợp lệ' } })
+  }
+  return json(await saveInvite(store, payload))
+}
