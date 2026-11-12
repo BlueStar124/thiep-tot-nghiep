@@ -3,7 +3,7 @@
  *  - api/invite.ts (chạy trên Vercel, lưu vào Upstash Redis)
  *  - vite.config.ts (chạy thử trên máy, lưu vào file .data/invites.json)
  */
-import { assignGuestSlugs, ownerSlugFrom, slugDisplay, SLUG_RE, RESERVED_SLUGS, type Guest } from '../src/lib/slug'
+import { assignGuestSlugs, ownerSlugFrom, slugDisplay, SLUG_RE, RESERVED_SLUGS, type Guest } from '../src/lib/slug.js'
 
 export interface KV {
   get(key: string): Promise<string | null>

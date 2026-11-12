@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
-import { getInvite, saveInvite, type KV } from './server/invite-store'
+import { getInvite, saveInvite, type KV } from './server/invite-store.js'
 
 /** Chạy thử API /api/invite trên máy: lưu vào file .data/invites.json thay cho Upstash */
 function localInviteApi(): Plugin {

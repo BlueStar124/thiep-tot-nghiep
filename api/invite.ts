@@ -4,7 +4,7 @@
  * Vercel tự thêm biến môi trường KV_REST_API_URL / KV_REST_API_TOKEN (hoặc UPSTASH_REDIS_REST_URL / _TOKEN).
  */
 import { Redis } from '@upstash/redis'
-import { getInvite, saveInvite, type ApiResult, type KV } from '../server/invite-store'
+import { getInvite, saveInvite, type ApiResult, type KV } from '../server/invite-store.js'
 
 function kv(): KV | null {
   const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
