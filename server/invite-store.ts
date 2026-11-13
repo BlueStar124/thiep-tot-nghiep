@@ -167,6 +167,8 @@ export async function getInvite(kv: KV, slug: string | null, guestSlug?: string 
   const rec = await readInvite(kv, slug)
   if (!rec) return { status: 404, body: { error: 'Không tìm thấy thiệp' } }
   const guest = guestSlug ? rec.guests.find((g) => g.slug === guestSlug.toLowerCase()) : undefined
+  // Khách đã bị chủ thiệp xoá khỏi danh sách → link riêng của họ coi như không còn
+  if (guestSlug && !guest) return { status: 404, body: { error: 'Link này không còn tồn tại' } }
   return { status: 200, body: { slug: shown(rec), invitation: rec.invitation, guests: guest ? [guest] : [] } }
 }
 

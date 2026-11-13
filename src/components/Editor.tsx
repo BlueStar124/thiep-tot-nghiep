@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Eye, GraduationCap, CalendarClock, MessageSquareHeart, Link2, RotateCcw, ImageIcon, PencilLine, Users, X, Plus, Heart } from 'lucide-react'
+import { Eye, GraduationCap, CalendarClock, MessageSquareHeart, Link2, RotateCcw, ImageIcon, PencilLine, Users, X, Plus, Heart, Save, Check, Loader2 } from 'lucide-react'
 import { CollageInvite } from './CollageInvite'
 import { PublishSheet, field, label } from './Sheets'
 import { assignGuestSlugs, ownerSlugFrom, slugDisplay } from '../lib/slug'
-import { loadGuestNames, loadOwner, refreshOwner, saveGuestNames } from '../lib/api'
+import { hasUnsaved, loadGuestNames, loadOwner, publishInvite, refreshOwner, saveGuestNames } from '../lib/api'
 import { DEFAULT_INVITATION, formatCeremony, type Invitation } from '../config/invitation'
 
 interface Props {
@@ -58,6 +58,45 @@ export const Editor: React.FC<Props> = ({ inv, onChange, onPreview }) => {
   const c = formatCeremony(inv)
   const valid = inv.graduateName.trim() && inv.startISO && inv.ceremonyHall.trim()
 
+  // Lưu lên máy chủ: mọi link khách đều đọc chung một bản thiệp nên lưu 1 lần là tất cả cập nhật theo
+  const [saveState, setSaveState] = useState<{ s: 'idle' | 'saving' | 'saved' | 'error'; msg?: string }>({ s: 'idle' })
+  const [, bump] = useState(0)
+  const unsaved = !!owner && (hasUnsaved(inv, guestNames) || !!renameTo)
+  const save = async (names = guestNames) => {
+    if (!owner || !valid || saveState.s === 'saving') return
+    setSaveState({ s: 'saving' })
+    try {
+      await publishInvite(inv, names, linkSlug, renameTo)
+      setOwner(loadOwner())
+      setRenaming(false)
+      setSaveState({ s: 'saved' })
+      setTimeout(() => setSaveState((v) => (v.s === 'saved' ? { s: 'idle' } : v)), 2500)
+    } catch (err) {
+      setSaveState({ s: 'error', msg: (err as Error).message })
+    }
+    bump((n) => n + 1)
+  }
+  const removeGuest = (i: number) => {
+    const g = guests[i]
+    if (owner && !confirm(`Xoá ${g.name}?\nLink ${host}/${linkSlug}/${g.slug} sẽ không mở được nữa.`)) return
+    const next = guestNames.filter((_, k) => k !== i)
+    updateGuests(next)
+    if (owner) save(next) // đã có link → xoá luôn trên máy chủ
+  }
+  // Ctrl/Cmd + S để lưu nhanh
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        save()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+  const saveLabel = saveState.s === 'saving' ? 'Đang lưu…' : saveState.s === 'saved' ? 'Đã lưu' : unsaved ? 'Lưu thay đổi' : 'Đã lưu'
+  const SaveIcon = saveState.s === 'saving' ? Loader2 : unsaved && saveState.s !== 'saved' ? Save : Check
+
   const reset = () => {
     if (confirm('Khôi phục nội dung mẫu? Thông tin bạn đã nhập sẽ bị thay thế.')) onChange(DEFAULT_INVITATION)
   }
@@ -70,7 +109,9 @@ export const Editor: React.FC<Props> = ({ inv, onChange, onPreview }) => {
           <span className="w-9 h-9 rounded-full bg-[#1d4ed8] text-white text-[11px] font-extrabold flex items-center justify-center tracking-tight">HUIT</span>
           <div className="min-w-0">
             <p className="text-[14px] font-extrabold text-slate-900 leading-tight truncate">Tạo thiệp tốt nghiệp</p>
-            <p className="text-[12px] text-slate-500 leading-tight truncate">Tự động lưu trên máy này</p>
+            <p className={`text-[12px] leading-tight truncate ${unsaved ? 'text-amber-600 font-semibold' : 'text-slate-500'}`}>
+              {!owner ? 'Tự động lưu trên máy này' : unsaved ? 'Có thay đổi chưa lưu – khách vẫn thấy bản cũ' : 'Khách đang thấy bản mới nhất'}
+            </p>
           </div>
           {/* Lời chúc khách gửi: trang /dashboard */}
           <a href="/dashboard" className="ml-auto btn btn--soft h-11 min-h-0 px-3.5 shrink-0" aria-label="Xem lời chúc">
@@ -80,9 +121,20 @@ export const Editor: React.FC<Props> = ({ inv, onChange, onPreview }) => {
             <button onClick={onPreview} className="btn btn--soft h-11 min-h-0">
               <Eye className="w-4 h-4" /> Xem như khách
             </button>
-            <button onClick={() => setShareOpen(true)} disabled={!valid} className="btn btn--primary h-11 min-h-0 disabled:opacity-50">
-              <Link2 className="w-4 h-4" /> Tạo link thiệp
-            </button>
+            {owner ? (
+              <>
+                <button onClick={() => setShareOpen(true)} disabled={!valid} className="btn btn--soft h-11 min-h-0 disabled:opacity-50">
+                  <Link2 className="w-4 h-4" /> Link thiệp
+                </button>
+                <button onClick={() => save()} disabled={!valid || !unsaved || saveState.s === 'saving'} className="btn btn--primary h-11 min-h-0 disabled:opacity-60" title="Ctrl + S">
+                  <SaveIcon className={`w-4 h-4 ${saveState.s === 'saving' ? 'animate-spin' : ''}`} /> {saveLabel}
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setShareOpen(true)} disabled={!valid} className="btn btn--primary h-11 min-h-0 disabled:opacity-50">
+                <Link2 className="w-4 h-4" /> Tạo link thiệp
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -201,7 +253,7 @@ export const Editor: React.FC<Props> = ({ inv, onChange, onPreview }) => {
                 {owner && renaming ? (
                   renameTo ? (
                     <>
-                      Link mới: <b className="text-slate-800">{host}/{renameTo}</b>. Bấm “Tạo link thiệp” để lưu. Link cũ vẫn tự chuyển sang link mới.
+                      Link mới: <b className="text-slate-800">{host}/{renameTo}</b>. Bấm “Lưu thay đổi” để áp dụng. Link cũ vẫn tự chuyển sang link mới.
                     </>
                   ) : (
                     'Gõ tên link mới: chữ không dấu, số, dấu gạch ngang. Giữ được chữ hoa, ví dụ XuanCuong.'
@@ -244,7 +296,7 @@ export const Editor: React.FC<Props> = ({ inv, onChange, onPreview }) => {
                         {host}/{linkSlug}/<b className="text-slate-700">{g.slug}</b>
                       </span>
                     </span>
-                    <button onClick={() => updateGuests(guestNames.filter((_, k) => k !== i))} className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700" aria-label={`Xoá ${g.name}`}>
+                    <button onClick={() => removeGuest(i)} disabled={saveState.s === 'saving'} className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700" aria-label={`Xoá ${g.name}`}>
                       <X className="w-4 h-4" />
                     </button>
                   </li>
@@ -283,10 +335,28 @@ export const Editor: React.FC<Props> = ({ inv, onChange, onPreview }) => {
 
       {/* Thanh dưới (điện thoại) */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] bg-white/90 backdrop-blur border-t border-slate-200/70">
-        <button onClick={() => setShareOpen(true)} disabled={!valid} className="btn btn--primary w-full h-[52px] text-[16px] disabled:opacity-50">
-          <Link2 className="w-5 h-5" /> Tạo link thiệp
-        </button>
+        {owner ? (
+          <div className="flex gap-2">
+            <button onClick={() => setShareOpen(true)} disabled={!valid} className="btn btn--soft h-[52px] px-4 shrink-0 disabled:opacity-50" aria-label="Link thiệp">
+              <Link2 className="w-5 h-5" />
+            </button>
+            <button onClick={() => save()} disabled={!valid || !unsaved || saveState.s === 'saving'} className="btn btn--primary flex-1 h-[52px] text-[16px] disabled:opacity-60">
+              <SaveIcon className={`w-5 h-5 ${saveState.s === 'saving' ? 'animate-spin' : ''}`} /> {saveLabel}
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setShareOpen(true)} disabled={!valid} className="btn btn--primary w-full h-[52px] text-[16px] disabled:opacity-50">
+            <Link2 className="w-5 h-5" /> Tạo link thiệp
+          </button>
+        )}
       </div>
+
+      {saveState.s === 'error' && (
+        <div role="alert" className="fixed left-1/2 -translate-x-1/2 bottom-24 lg:bottom-6 z-40 max-w-[92vw] rounded-2xl bg-red-600 text-white px-4 py-3 text-[14px] font-semibold shadow-card flex items-center gap-3">
+          Chưa lưu được: {saveState.msg}
+          <button onClick={() => setSaveState({ s: 'idle' })} className="underline shrink-0">Đóng</button>
+        </div>
+      )}
 
       <PublishSheet open={shareOpen} onClose={() => setShareOpen(false)} invitation={inv} guestNames={guestNames} desiredSlug={linkSlug} newSlug={renameTo} />
     </div>

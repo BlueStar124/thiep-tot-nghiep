@@ -105,6 +105,27 @@ export async function login(password: string, slug?: string): Promise<{ invitati
   return { invitation: res.invitation }
 }
 
+/** Bản đã lưu lên máy chủ gần nhất – để biết còn thay đổi nào chưa lưu */
+const SAVED_KEY = 'huit_saved_v1'
+const snapshot = (invitation: Invitation, guestNames: string[]) => JSON.stringify({ invitation, guestNames })
+
+function markSaved(invitation: Invitation, guestNames: string[]) {
+  try {
+    localStorage.setItem(SAVED_KEY, snapshot(invitation, guestNames))
+  } catch {
+    // bỏ qua
+  }
+}
+
+/** Nội dung/danh sách khách trên máy này có khác bản đã lưu lên máy chủ không */
+export function hasUnsaved(invitation: Invitation, guestNames: string[]) {
+  try {
+    return localStorage.getItem(SAVED_KEY) !== snapshot(invitation, guestNames)
+  } catch {
+    return true
+  }
+}
+
 /** Lưu thiệp lên máy chủ: lần đầu tạo link mới, các lần sau cập nhật đúng link cũ */
 export async function publishInvite(invitation: Invitation, guestNames: string[], desiredSlug?: string, newSlug?: string): Promise<{ slug: string; guests: Guest[] }> {
   const owner = loadOwner()
@@ -126,6 +147,7 @@ export async function publishInvite(invitation: Invitation, guestNames: string[]
       res = await post({ desiredSlug: owner.slug, invitation, guests: guestNames, password: adminPassword() })
     } else throw err
   }
+  markSaved(invitation, guestNames)
   if (res.editKey) saveOwner({ slug: res.slug, editKey: res.editKey })
   else if (owner && res.slug !== owner.slug) saveOwner({ slug: res.slug, editKey: owner.editKey }) // đã đổi tên link
   return res
