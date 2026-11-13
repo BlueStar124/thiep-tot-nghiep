@@ -92,18 +92,20 @@ export const InvitePage: React.FC<Props> = ({ inv, guestName, onOpenMap, celebra
           <div className="w-full max-w-[460px] mx-auto lg:mx-0 lg:sticky lg:top-6 space-y-5 animate-[rise_.7s_.1s_cubic-bezier(.2,.8,.2,1)_both]">
             <div className="min-w-0">
               <p className="text-[13px] font-semibold tracking-[.16em] text-[#333]">TRÂN TRỌNG KÍNH MỜI</p>
-              {guestName && (
-                <div className="mt-3">
-                  <span className="name-tag max-w-full">
-                    <span className="break-words">{guestName}</span>
-                  </span>
-                  <p className="mt-3 text-[15px] text-[#333]">đến dự Lễ Tốt nghiệp của</p>
-                </div>
-              )}
+              {/* Link riêng: tên khách; link chung: mời mọi người (không để tên chủ thiệp nằm ngay dưới "Kính mời") */}
+              <div className="mt-3">
+                <span className="name-tag max-w-full">
+                  <span className="break-words">{guestName ?? 'Quý thầy cô, gia đình & bạn bè'}</span>
+                </span>
+                <p className="mt-5 text-[15px] text-[#333]">đến dự Lễ Tốt nghiệp của</p>
+              </div>
               {/* Tên luôn nằm trên 1 hàng: tự thu nhỏ theo độ dài tên và bề rộng màn hình */}
-              <FitText as="h1" max={40} min={18} className="mt-2 font-black leading-[1.08] tracking-tight uppercase">
-                {inv.graduateName}
-              </FitText>
+              {/* Bọc ngoài để giữ khoảng cách: dấu chồng (Ễ) nhô cao không chạm dòng "đến dự…" */}
+              <div className="mt-5">
+                <FitText as="h1" max={40} min={18} className="font-black leading-[1.15] tracking-tight uppercase">
+                  {inv.graduateName}
+                </FitText>
+              </div>
               <p className="mt-2 text-[15px] font-medium text-[#333]">
                 {inv.degreeTitle} · {inv.faculty}
               </p>
