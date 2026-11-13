@@ -26,3 +26,9 @@ dist-ssr
 # Dữ liệu thiệp khi chạy thử trên máy
 .data
 .vercel
+
+# Video TikTok: chỉ giữ script, bỏ file nặng / ảnh cá nhân
+video/audio
+video/clips
+video/shots
+video/out

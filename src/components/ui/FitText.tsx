@@ -52,7 +52,8 @@ export const FitText: React.FC<Props> = ({ children, max, min, mode = 'line', ma
     }
   }, [children, max, min, mode, maxHeight])
 
-  const base: React.CSSProperties = mode === 'line' ? { display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' } : { overflow: 'hidden' }
+  // Chỉ cắt theo chiều ngang: overflow: hidden cắt luôn dấu chồng tiếng Việt (Ễ, Ỗ, Ợ…) nhô lên trên dòng chữ
+  const base: React.CSSProperties = mode === 'line' ? { display: 'block', whiteSpace: 'nowrap', overflowX: 'clip', overflowY: 'visible' } : { overflow: 'hidden' }
   // Không đặt fontSize qua React (mỗi lần vẽ lại sẽ bị đè về max) – cỡ chữ do bộ đo ở trên tự đặt
   return React.createElement(Tag, { ref, className, style: { ...base, ...style } }, children)
 }
