@@ -42,7 +42,7 @@ export const App: React.FC = () => {
   // Khách mở link /ten-thiep/ten-khach → tải thiệp từ máy chủ
   useEffect(() => {
     const { slug, guestSlug } = route.current
-    if (!slug || legacy.current) return
+    if (!slug || legacy.current || isDashboard) return // /dashboard là trang của chủ thiệp, không phải tên thiệp
     let alive = true
     fetchInvite(slug, guestSlug)
       .then((data) => {

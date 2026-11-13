@@ -95,8 +95,9 @@ export const Editor: React.FC<Props> = ({ inv, onChange, onPreview }) => {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
-  const saveLabel = saveState.s === 'saving' ? 'Đang lưu…' : saveState.s === 'saved' ? 'Đã lưu' : unsaved ? 'Lưu thay đổi' : 'Đã lưu'
-  const SaveIcon = saveState.s === 'saving' ? Loader2 : unsaved && saveState.s !== 'saved' ? Save : Check
+  // Còn thay đổi chưa lưu thì luôn hiện "Lưu thay đổi" (kể cả ngay sau lần lưu trước) để bấm lưu tiếp được
+  const saveLabel = saveState.s === 'saving' ? 'Đang lưu…' : unsaved ? 'Lưu thay đổi' : 'Đã lưu'
+  const SaveIcon = saveState.s === 'saving' ? Loader2 : unsaved ? Save : Check
 
   const reset = () => {
     if (confirm('Khôi phục nội dung mẫu? Thông tin bạn đã nhập sẽ bị thay thế.')) onChange(DEFAULT_INVITATION)
