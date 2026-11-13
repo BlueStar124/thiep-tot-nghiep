@@ -3,6 +3,7 @@ import { Eye, EyeOff, LockKeyhole } from 'lucide-react'
 import { login } from '../lib/api'
 import { ownerSlugFrom } from '../lib/slug'
 import type { Invitation } from '../config/invitation'
+import { HuitLogo } from './ui/HuitLogo'
 
 /**
  * Màn khoá trang chính: chỉ chủ thiệp (biết mật khẩu ADMIN_PASSWORD) mới vào được trình tạo thiệp.
@@ -35,7 +36,7 @@ export const LockScreen: React.FC<{ graduateName: string; onUnlock: (loaded?: Pa
     <div className="paper-bg min-h-svh flex items-center justify-center px-5 py-10">
       <form onSubmit={submit} className="w-full max-w-sm">
         <div className="text-center">
-          <div className="mx-auto mb-5 w-14 h-14 rounded-full bg-[#1f5fbf] text-white text-[14px] font-extrabold flex items-center justify-center">HUIT</div>
+          <HuitLogo className="mx-auto mb-5 w-14 h-14 block" />
           <p className="text-[13px] font-semibold tracking-[.16em] text-[#333]">TRANG CỦA CHỦ THIỆP</p>
           <h1 className="mt-2 text-[28px] font-black leading-[1.1] tracking-tight">NHẬP MẬT KHẨU</h1>
           <p className="mt-2 text-[14px] text-[#444]">Khách mời mở thiệp bằng link riêng được gửi, không cần vào trang này.</p>

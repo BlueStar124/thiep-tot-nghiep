@@ -3,6 +3,7 @@ import { ArrowDown, ChevronDown, ChevronUp, Clock, MapPin, Navigation, Smartphon
 import { SceneCanvas } from './SceneCanvas'
 import { CHAPTERS } from '../config/campus'
 import { SCHOOL, formatCeremony, type Invitation } from '../config/invitation'
+import { HuitLogo } from './ui/HuitLogo'
 
 const LAST = CHAPTERS.length - 1
 
@@ -102,7 +103,7 @@ export const MapTour: React.FC<{ inv: Invitation; onClose: () => void }> = ({ in
 
       <header className="fixed top-0 inset-x-0 z-40 px-4 sm:px-6 pt-4 flex items-center gap-2 pointer-events-none">
         <div className="pointer-events-auto flex items-center gap-2.5 rounded-full bg-white/90 backdrop-blur shadow-card pl-1.5 pr-4 h-11">
-          <span className="w-8 h-8 rounded-full bg-[#1d4ed8] text-white text-[11px] font-extrabold flex items-center justify-center tracking-tight">HUIT</span>
+          <HuitLogo className="w-8 h-8" />
           <span className="text-[13px] font-bold text-slate-900 whitespace-nowrap">Đường tới hội trường</span>
         </div>
         <button onClick={onClose} className="pointer-events-auto ml-auto h-11 pl-3 pr-4 rounded-full bg-slate-900 text-white text-[13px] font-bold shadow-card flex items-center gap-1.5 whitespace-nowrap">

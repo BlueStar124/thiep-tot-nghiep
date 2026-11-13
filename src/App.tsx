@@ -10,6 +10,7 @@ const MapTour = lazy(() => import('./components/MapTour').then((m) => ({ default
 const Dashboard = lazy(() => import('./components/Dashboard').then((m) => ({ default: m.Dashboard })))
 const LockScreen = lazy(() => import('./components/LockScreen').then((m) => ({ default: m.LockScreen })))
 import { fetchInvite, isUnlocked } from './lib/api'
+import { HuitLogo } from './components/ui/HuitLogo'
 
 /**
  * - /minh/co-lan → thiệp của Minh gửi riêng Cô Lan (đọc từ database)
@@ -139,7 +140,7 @@ const Loading: React.FC<{ text: string }> = ({ text }) => (
 const GuestStatus: React.FC<{ state: Exclude<GuestState, { status: 'ready' }> }> = ({ state }) => (
   <div className="paper-bg min-h-svh flex items-center justify-center px-6 text-center">
     <div className="max-w-sm">
-      <div className="mx-auto mb-5 w-14 h-14 rounded-full bg-[#1f5fbf] text-white text-[14px] font-extrabold flex items-center justify-center">HUIT</div>
+      <HuitLogo className="mx-auto mb-5 w-14 h-14 block" />
       {state.status === 'loading' ? (
         // Giống hệt màn chào trong index.html → chuyển cảnh không bị nháy
         <>

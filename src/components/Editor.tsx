@@ -5,6 +5,7 @@ import { PublishSheet, field, label } from './Sheets'
 import { assignGuestSlugs, ownerSlugFrom, slugDisplay } from '../lib/slug'
 import { hasUnsaved, loadGuestNames, loadOwner, publishInvite, refreshOwner, saveGuestNames } from '../lib/api'
 import { DEFAULT_INVITATION, formatCeremony, type Invitation } from '../config/invitation'
+import { HuitLogo } from './ui/HuitLogo'
 
 interface Props {
   inv: Invitation
@@ -106,7 +107,7 @@ export const Editor: React.FC<Props> = ({ inv, onChange, onPreview }) => {
       {/* Thanh trên */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-slate-200/70">
         <div className="mx-auto max-w-[1120px] px-4 sm:px-6 h-16 flex items-center gap-3">
-          <span className="w-9 h-9 rounded-full bg-[#1d4ed8] text-white text-[11px] font-extrabold flex items-center justify-center tracking-tight">HUIT</span>
+          <HuitLogo className="w-9 h-9" />
           <div className="min-w-0">
             <p className="text-[14px] font-extrabold text-slate-900 leading-tight truncate">Tạo thiệp tốt nghiệp</p>
             <p className={`text-[12px] leading-tight truncate ${unsaved ? 'text-amber-600 font-semibold' : 'text-slate-500'}`}>

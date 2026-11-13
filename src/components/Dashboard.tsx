@@ -4,6 +4,7 @@ import { deleteWish, fetchWishes, inviteUrl, loadGuestNames, loadOwner, type Wis
 import type { Invitation } from '../config/invitation'
 import { formatCeremony } from '../config/invitation'
 import { FitText } from './ui/FitText'
+import { HuitLogo } from './ui/HuitLogo'
 
 type Filter = 'all' | 'yes' | 'no'
 type Load = { status: 'loading' } | { status: 'ready'; wishes: Wish[] } | { status: 'error'; message: string }
@@ -77,7 +78,7 @@ export const Dashboard: React.FC<{ inv: Invitation }> = ({ inv }) => {
       <div className="mx-auto w-full max-w-[1040px] px-4 sm:px-6 pt-[max(16px,env(safe-area-inset-top))] pb-[max(48px,env(safe-area-inset-bottom))]">
         {/* Thanh trên – giống trang khách */}
         <header className="flex items-center gap-2.5 h-11">
-          <span className="w-10 h-10 shrink-0 rounded-full bg-[#1f5fbf] text-white text-[11px] font-extrabold flex items-center justify-center tracking-tight">HUIT</span>
+          <HuitLogo className="w-10 h-10" />
           <span className="min-w-0 flex-1 truncate text-[14px] font-extrabold tracking-wide">LỜI CHÚC</span>
           <a href="/" className="h-11 shrink-0 px-3 sm:px-3.5 rounded-xl border-2 border-[#111] bg-white flex items-center gap-1.5 text-[13px] font-bold">
             <ArrowLeft className="w-4 h-4" /> Sửa thiệp
